@@ -1,0 +1,159 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Phone, ArrowRight, Loader2, AlertCircle } from 'lucide-react'
+import { useAuth } from '../../context/AuthContext'
+import logo from '../../assets/trans-logo.png'
+
+export default function Login() {
+  const [phone, setPhone]     = useState('')
+  const [error, setError]     = useState('')
+  const [isFocused, setIsFocused] = useState(false)
+  const { sendOTP, sendingOTP } = useAuth()
+  const navigate = useNavigate()
+
+  const validate = () => {
+    const digits = phone.replace(/\D/g, '')
+    if (digits.length !== 10) {
+      setError('Please enter a valid 10-digit mobile number')
+      return false
+    }
+    setError('')
+    return true
+  }
+
+  const handleSend = async () => {
+    if (!validate()) return
+    const res = await sendOTP(phone.replace(/\D/g, ''))
+    if (res.success) {
+      navigate('/otp', { state: { phone: phone.replace(/\D/g, '') } })
+    } else {
+      setError('Could not send OTP. Please try again.')
+    }
+  }
+
+  const handleKeyDown = (e) => { if (e.key === 'Enter') handleSend() }
+
+  const formatPhone = (val) => {
+    const digits = val.replace(/\D/g, '').slice(0, 10)
+    if (digits.length <= 5) return digits
+    return `${digits.slice(0, 5)} ${digits.slice(5)}`
+  }
+
+  return (
+    <div className="animate-fadeIn login-container" style={{ maxWidth: 420, margin: '0 auto', paddingBottom: 20 }}>
+      {/* Header */}
+      <div style={{ textAlign: 'center', marginBottom: 20 }}>
+        <div style={{ 
+          width: 95, height: 95, borderRadius: 28, background: 'white',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px',
+          boxShadow: '0 12px 36px rgba(0,0,0,0.1)', position: 'relative',
+          border: '1.5px solid #F1F5F9'
+        }}>
+          <img src={logo} alt="Logo" style={{ width: '80%', height: '80%', objectFit: 'contain' }} />
+        </div>
+        <h2 style={{ 
+          fontSize: '1.5rem', fontWeight: 950, color: '#0F172A', letterSpacing: '-0.04em', marginBottom: 4,
+          background: 'linear-gradient(to right, #0F172A, #4C1D95)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
+        }}>
+          Welcome to TRANS
+        </h2>
+        <p style={{ fontSize: '0.8125rem', color: '#64748B', fontWeight: 600, lineHeight: 1.4 }}>
+          Enter your mobile number to get started.<br />
+          We'll send you a <span style={{ color: '#7C3AED', fontWeight: 800 }}>6-digit OTP</span>.
+        </p>
+      </div>
+
+      {/* Main Login Card */}
+      <div style={{ 
+        background: 'white', padding: '24px 20px', borderRadius: 28, 
+        border: '1px solid #F1F5F9', boxShadow: '0 20px 50px rgba(0,0,0,0.03)',
+        position: 'relative'
+      }}>
+        <div className="form-group" style={{ marginBottom: 20 }}>
+          <label style={{ fontSize: '0.75rem', fontWeight: 850, color: '#1E293B', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6, opacity: 0.8 }}>
+            <Phone size={13} color="#7C3AED" /> MOBILE NUMBER
+          </label>
+          
+          <div style={{ 
+            height: 54, borderRadius: 16, display: 'flex', overflow: 'hidden', border: '2px solid',
+            borderColor: error ? '#FECACA' : (isFocused ? '#7C3AED' : '#F1F5F9'),
+            background: error ? '#FEF2F2' : (isFocused ? '#FDFDFF' : '#F9FAFB'),
+            transition: 'all 0.25s ease',
+            boxShadow: isFocused && !error ? '0 4px 12px rgba(124, 58, 237, 0.08)' : 'none'
+          }}>
+            <div style={{ 
+              padding: '0 14px', background: error ? '#FEE2E2' : '#F1F5F9', 
+              borderRight: '1px solid', borderColor: error ? '#FECACA' : '#E2E8F0',
+              height: '100%', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0
+            }}>
+               <span style={{ fontSize: '0.9rem' }}>🇮🇳</span>
+               <span style={{ fontWeight: 900, color: '#0F172A', fontSize: '0.875rem' }}>+91</span>
+            </div>
+            <input
+              id="phone-input"
+              type="tel"
+              inputMode="numeric"
+              placeholder="98765 43210"
+              value={formatPhone(phone)}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              onChange={e => {
+                setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))
+                if (error) setError('')
+              }}
+              onKeyDown={handleKeyDown}
+              className="login-input"
+              style={{ border: 'none', background: 'transparent', width: '100%', height: '100%', fontSize: '1.0625rem', fontWeight: 800, padding: '0 16px', color: '#0F172A', outline: 'none' }}
+            />
+          </div>
+          
+          {error && (
+            <div style={{ marginTop: 8, color: '#DC2626', fontSize: '0.7rem', fontWeight: 750, display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 4 }}>
+              <AlertCircle size={14} /> {error}
+            </div>
+          )}
+        </div>
+
+        <button
+          id="btn-send-otp"
+          onClick={handleSend}
+          disabled={sendingOTP || phone.replace(/\D/g, '').length < 10}
+          className="btn btn-primary"
+          style={{ 
+            height: 50, width: '100%', borderRadius: 14, fontSize: '0.9rem', fontWeight: 900, 
+            background: 'linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)', 
+            boxShadow: '0 8px 24px rgba(124, 58, 237, 0.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            border: 'none', color: 'white', cursor: 'pointer', transition: '0.2s'
+          }}
+        >
+          {sendingOTP ? (
+            <><Loader2 size={18} className="spin" /> Sending...</>
+          ) : (
+            <>Get Authentication OTP <ArrowRight size={18} strokeWidth={2.5} /></>
+          )}
+        </button>
+
+        <p style={{ textAlign: 'center', fontSize: '0.7rem', color: '#94A3B8', marginTop: 18, fontWeight: 600, lineHeight: 1.5 }}>
+          Authorized access only. By continuing you agree to<br/>
+          <span style={{ color: '#7C3AED', textDecoration: 'underline', textDecorationColor: 'rgba(124, 58, 237, 0.2)' }}>Terms of Service</span> and <span style={{ color: '#7C3AED', textDecoration: 'underline', textDecorationColor: 'rgba(124, 58, 237, 0.2)' }}>Privacy Policy</span>.
+        </p>
+      </div>
+
+      <style>{`
+        .spin { animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .btn:active { transform: scale(0.97); }
+        .login-input::placeholder { color: #CBD5E1; font-weight: 500; }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-4px); }
+          75% { transform: translateX(4px); }
+        }
+        @media (max-width: 400px) {
+           .login-container { transform: scale(0.95); margin-top: -10px; }
+        }
+      `}</style>
+    </div>
+  )
+}

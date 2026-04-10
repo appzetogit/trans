@@ -1,0 +1,160 @@
+import React, { useMemo } from 'react'
+import { Truck, MapPin, Receipt, TrendingUp, TrendingDown, Clock, ArrowRight, Plus, Users, Shield } from 'lucide-react'
+import { useBills } from '../../context/BillContext'
+import { useVehicles } from '../../context/VehicleContext'
+import { useNavigate } from 'react-router-dom'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import dayjs from 'dayjs'
+
+export default function TransportDashboard() {
+  const { bills } = useBills()
+  const { vehicles } = useVehicles()
+  const navigate = useNavigate()
+
+  const transportBills = useMemo(() => bills.filter(b => b.type === 'transport'), [bills])
+
+  const stats = useMemo(() => {
+    // subtotal or grandTotal represents the revenue
+    const totalFreight = transportBills.reduce((s, b) => s + (b.grandTotal || 0), 0)
+    const pendingAmount = transportBills.filter(b => b.status !== 'paid').reduce((s, b) => s + (b.grandTotal || 0), 0)
+    const totalTrips = transportBills.reduce((s, b) => s + (b.items?.length || 0), 0)
+    const fleetSize = vehicles.length
+
+    return [
+      { label: 'Total Revenue', value: `₹${totalFreight.toLocaleString()}`, sub: 'From all bills', icon: TrendingUp, color: '#16A34A', bg: '#DCFCE7' },
+      { label: 'Pending', value: `₹${pendingAmount.toLocaleString()}`, sub: 'Unpaid bills', icon: Clock, color: '#DC2626', bg: '#FEE2E2' },
+      { label: 'Total Trips', value: totalTrips.toString(), sub: 'In system', icon: Truck, color: '#F3811E', bg: '#FFF7ED' },
+      { label: 'Active Fleet', value: fleetSize.toString(), sub: 'Vehicles', icon: Users, color: '#2563EB', bg: '#DBEAFE' },
+    ]
+  }, [transportBills, vehicles])
+
+  const chartData = useMemo(() => {
+    return transportBills.slice(-7).reverse().map(b => ({
+      date: dayjs(b.billDate).format('D MMM'),
+      amount: b.grandTotal
+    }))
+  }, [transportBills])
+
+  return (
+    <div className="page-wrapper animate-fadeIn" style={{ paddingBottom: 60 }}>
+      {/* Banner */}
+      <div style={{ background: 'linear-gradient(135deg, #0F0D2E, #2D2A5A)', borderRadius: 28, padding: '28px', color: 'white', marginBottom: 20, position: 'relative', overflow: 'hidden', boxShadow: '0 10px 30px rgba(15, 13, 46, 0.2)' }}>
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 900, margin: 0, color: 'white' }}>Transport Dashboard</h1>
+          <p style={{ fontSize: '0.875rem', color: 'rgba(255,255,255,0.9)', marginTop: 4 }}>Manage logistics fleet and consolidated freight</p>
+        </div>
+        <Truck size={100} color="rgba(255,255,255,0.05)" style={{ position: 'absolute', bottom: -20, right: 10, transform: 'rotate(-10deg)' }} />
+      </div>
+
+      {/* Insurance Banner - Small Horizontal Box */}
+      <div 
+        onClick={() => navigate('/insurance')}
+        style={{ 
+          background: 'white', 
+          borderRadius: 20, 
+          padding: '12px 20px', 
+          marginBottom: 20, 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: 16, 
+          cursor: 'pointer',
+          border: '1px solid #E5E7EB',
+          boxShadow: '0 4px 15px rgba(0,0,0,0.02)',
+          transition: 'all 0.2s'
+        }}
+        onMouseEnter={e => {
+          e.currentTarget.style.transform = 'translateY(-2px)'
+          e.currentTarget.style.borderColor = '#7C3AED'
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.borderColor = '#E5E7EB'
+        }}
+      >
+        <div style={{ width: 40, height: 40, borderRadius: 12, background: '#F5F3FF', color: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Shield size={20} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '0.8rem', fontWeight: 850, color: '#1F2937', display: 'flex', alignItems: 'center', gap: 6 }}>
+            Insurance Service <span style={{ fontSize: '0.6rem', background: '#F59E0B', color: 'white', padding: '2px 8px', borderRadius: 100, textTransform: 'uppercase' }}>New</span>
+          </div>
+          <div style={{ fontSize: '0.65rem', color: '#6B7280', marginTop: 2 }}>Secure your fleet with 20+ insurers starting at ₹2094/yr</div>
+        </div>
+        <ArrowRight size={18} color="#9CA3AF" />
+      </div>
+
+      {/* Stats */}
+      <div className="stats-grid" style={{ marginBottom: 20 }}>
+        {stats.map(s => (
+          <div key={s.label} style={{ background: 'white', borderRadius: 24, padding: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.02)' }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+              <s.icon size={20} color={s.color} />
+            </div>
+            <div style={{ fontSize: '1.125rem', fontWeight: 900, color: '#111827' }}>{s.value}</div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#6B7280', textTransform: 'uppercase', marginTop: 2 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Analytics Chart */}
+      <div style={{ background: 'white', borderRadius: 28, padding: '24px', marginBottom: 20, boxShadow: '0 4px 15px rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.02)' }}>
+        <h3 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+           <TrendingUp size={18} color="#16A34A" /> Freight Revenue Trend
+        </h3>
+        <div style={{ width: '100%', height: 180 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData}>
+              <defs>
+                <linearGradient id="colorAmt" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.2}/>
+                  <stop offset="95%" stopColor="#4F46E5" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} dy={10} />
+              <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#9CA3AF'}} dx={-10} />
+              <Tooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+              <Area type="monotone" dataKey="amount" stroke="#4F46E5" fillOpacity={1} fill="url(#colorAmt)" strokeWidth={3} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div style={{ background: 'white', borderRadius: 28, padding: '24px', boxShadow: '0 4px 15px rgba(0,0,0,0.03)', border: '1px solid rgba(0,0,0,0.02)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 800 }}>Recent Activity</h3>
+          <button onClick={() => navigate('/bills')} className="btn btn-ghost btn-sm" style={{ color: '#4F46E5', fontWeight: 800 }}>View All</button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {transportBills.slice(0, 4).map((b, i) => (
+            <div key={i} onClick={() => navigate(`/bills/${b.id}`)} style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#F9FAFB', padding: '14px', borderRadius: 20, cursor: 'pointer', transition: '0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#F3F4F6'}>
+              <div style={{ width: 44, height: 44, borderRadius: 14, background: '#FFF7ED', color: '#F3811E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Receipt size={20} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '0.9rem', fontWeight: 800, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {b.billedToName || 'Consolidated Bill'}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>
+                   {b.items?.length || 0} trip(s) • {dayjs(b.billDate).format('DD MMM')}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '1rem', fontWeight: 900, color: '#111827' }}>₹{(b.grandTotal || 0).toLocaleString()}</div>
+                <div style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: b.status === 'paid' ? '#16A34A' : '#DC2626' }}>{b.status}</div>
+              </div>
+            </div>
+          ))}
+          {transportBills.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '20px', color: '#9CA3AF', fontSize: '0.875rem' }}>No recent activity</div>
+          )}
+        </div>
+      </div>
+
+      <button onClick={() => navigate('/bills/new')} className="btn btn-primary" style={{ position: 'fixed', bottom: 84, right: 20, borderRadius: 18, height: 56, padding: '0 24px', boxShadow: '0 8px 30px rgba(79, 70, 229, 0.4)', zIndex: 10 }}>
+        <Plus size={22} /> <span style={{ fontWeight: 800 }}>New Bill</span>
+      </button>
+    </div>
+  )
+}

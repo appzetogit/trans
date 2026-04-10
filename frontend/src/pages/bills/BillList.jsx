@@ -1,0 +1,212 @@
+import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Search, FileText, Truck, Wrench, X, Trash2, Eye } from 'lucide-react'
+import { useBills } from '../../context/BillContext'
+import { useAuth } from '../../context/AuthContext'
+import dayjs from 'dayjs'
+
+const STATUS_MAP = {
+  paid:    { label: 'Paid',    color: '#16A34A', bg: '#DCFCE7' },
+  unpaid:  { label: 'Unpaid',  color: '#DC2626', bg: '#FEE2E2' },
+  partial: { label: 'Partial', color: '#D97706', bg: '#FEF3C7' },
+  topay:   { label: 'To Pay',  color: '#D97706', bg: '#FEF3C7' },
+  tbb:     { label: 'TBB',     color: '#2563EB', bg: '#DBEAFE' },
+}
+
+function BillCard({ bill, onClick, onDelete }) {
+  const status = STATUS_MAP[bill.status] || STATUS_MAP.unpaid
+  const isTransport = bill.type === 'transport'
+  
+  // For consolidated transport bills, show the party and item count
+  const partyName = isTransport ? (bill.billedToName || 'Consolidated Bill') : (bill.customerName || '—')
+  const itemCount = bill.items?.length || 0
+  const subInfo = isTransport 
+    ? `${itemCount} Trip${itemCount !== 1 ? 's' : ''}` 
+    : (bill.vehicleNo || '—')
+
+  return (
+    <div
+      onClick={() => onClick(bill)}
+      style={{
+        background: 'white', borderRadius: 20, padding: '16px',
+        boxShadow: '0 4px 15px rgba(0,0,0,0.04)', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 14,
+        border: '1px solid rgba(0,0,0,0.02)', transition: '0.2s',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary-lighter)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.02)'; e.currentTarget.style.transform = 'none' }}
+    >
+      {/* Icon */}
+      <div style={{
+        width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+        background: isTransport ? '#FFF7ED' : '#F5F3FF',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {isTransport
+          ? <Truck size={22} color="#F3811E" />
+          : <Wrench size={22} color="#7C3AED" />}
+      </div>
+
+      {/* Info */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0F0D2E', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {bill.invoiceNo}
+          </span>
+          <span style={{
+            fontSize: '0.6rem', fontWeight: 800, padding: '2px 6px', borderRadius: 6,
+            background: status.bg, color: status.color, textTransform: 'uppercase', flexShrink: 0
+          }}>{status.label}</span>
+        </div>
+        <div style={{ fontSize: window.innerWidth < 640 ? '0.8rem' : '0.85rem', fontWeight: 700, color: '#1F2937', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {partyName}
+        </div>
+        <div style={{ fontSize: '0.7rem', color: '#9CA3AF', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {dayjs(bill.billDate || bill.createdAt).format('DD MMM')} • {subInfo}
+        </div>
+      </div>
+
+      {/* Amount + actions */}
+      <div style={{ textAlign: 'right', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
+        <div style={{ fontWeight: 900, fontSize: window.innerWidth < 640 ? '0.95rem' : '1.1rem', color: '#0F0D2E', marginBottom: 6 }}>
+          ₹{(bill.grandTotal || 0).toLocaleString()}
+        </div>
+        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+          <button onClick={e => { e.stopPropagation(); onClick(bill) }}
+            style={{ width: 28, height: 28, border: 'none', background: '#F3F4F6', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Eye size={12} color="#6B7280" />
+          </button>
+          <button onClick={e => { e.stopPropagation(); onDelete(bill.id) }}
+            style={{ width: 28, height: 28, border: 'none', background: '#FEE2E2', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Trash2 size={12} color="#DC2626" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function BillList() {
+  const { bills, deleteBill, loaded } = useBills()
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('all')
+
+  const userRole = user?.role || 'transport'
+  const isAdmin = userRole === 'admin'
+
+  const filtered = useMemo(() => {
+    let list = bills
+    if (!isAdmin) list = list.filter(b => b.type === userRole)
+
+    if (filter === 'paid')      list = list.filter(b => b.status === 'paid')
+    if (filter === 'unpaid')    list = list.filter(b => b.status !== 'paid')
+    if (filter === 'transport') list = list.filter(b => b.type === 'transport')
+    if (filter === 'garage')    list = list.filter(b => b.type === 'garage')
+    
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(b =>
+        b.invoiceNo?.toLowerCase().includes(q) ||
+        b.billedToName?.toLowerCase().includes(q) ||
+        b.customerName?.toLowerCase().includes(q) ||
+        b.vehicleNo?.toLowerCase().includes(q) ||
+        b.items?.some(item => 
+          item.companyFrom?.toLowerCase().includes(q) || 
+          item.companyTo?.toLowerCase().includes(q) || 
+          item.chalanNo?.toLowerCase().includes(q)
+        )
+      )
+    }
+    return list
+  }, [bills, filter, search, isAdmin, userRole])
+
+  const totals = useMemo(() => {
+    const list = isAdmin ? bills : bills.filter(b => b.type === userRole)
+    const paid = list.filter(b => b.status === 'paid').reduce((s, b) => s + (b.grandTotal || 0), 0)
+    const pending = list.filter(b => b.status !== 'paid').reduce((s, b) => s + (b.grandTotal || 0), 0)
+    return { paid, pending, count: list.length }
+  }, [bills, isAdmin, userRole])
+
+  const FILTERS = [
+    { val: 'all',       label: 'All' },
+    { val: 'unpaid',    label: 'Pending' },
+    { val: 'paid',      label: 'Paid' },
+    ...(isAdmin ? [
+      { val: 'transport', label: '🚛 Transport' },
+      { val: 'garage',    label: '🔧 Garage' }
+    ] : []),
+  ]
+
+  return (
+    <div className="page-wrapper animate-fadeIn" style={{ paddingBottom: 60 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <h2 style={{ fontWeight: 900, fontSize: window.innerWidth < 640 ? '1.25rem' : '1.5rem', color: '#0F0D2E', margin: 0 }}>Bills</h2>
+          <p style={{ fontSize: '0.8rem', color: '#6B7280', margin: 0 }}>{totals.count} managed</p>
+        </div>
+        <button 
+          className={window.innerWidth < 640 ? "btn btn-primary btn-sm" : "btn btn-primary btn-lg"} 
+          onClick={() => navigate('/bills/new')} 
+          style={{ borderRadius: 12, height: window.innerWidth < 640 ? 40 : 'auto', padding: window.innerWidth < 640 ? '0 12px' : '14px 28px' }}
+        >
+          <Plus size={window.innerWidth < 640 ? 18 : 20} /> <span className="hide-mobile">Add New</span>
+        </button>
+      </div>
+
+      {/* Summary Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+        <div style={{ background: '#F0FDF4', borderRadius: 20, padding: window.innerWidth < 640 ? '12px' : '16px', border: '1px solid #DCFCE7' }}>
+           <p style={{ fontSize: '0.65rem', fontWeight: 800, color: '#15803D', textTransform: 'uppercase', marginBottom: 4 }}>Paid In</p>
+           <p style={{ fontSize: window.innerWidth < 640 ? '1.1rem' : '1.25rem', fontWeight: 900, color: '#16A34A', margin: 0 }}>₹{totals.paid.toLocaleString()}</p>
+        </div>
+        <div style={{ background: '#FEF2F2', borderRadius: 20, padding: window.innerWidth < 640 ? '12px' : '16px', border: '1px solid #FEE2E2' }}>
+           <p style={{ fontSize: '0.65rem', fontWeight: 800, color: '#B91C1C', textTransform: 'uppercase', marginBottom: 4 }}>Pending</p>
+           <p style={{ fontSize: window.innerWidth < 640 ? '1.1rem' : '1.25rem', fontWeight: 900, color: '#DC2626', margin: 0 }}>₹{totals.pending.toLocaleString()}</p>
+        </div>
+      </div>
+
+      {/* Search & Filter */}
+      <div style={{ background: 'white', borderRadius: 28, padding: '16px', boxShadow: '0 10px 30px rgba(0,0,0,0.03)', marginBottom: 24 }}>
+        <div style={{ position: 'relative', marginBottom: 12 }}>
+          <Search size={18} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
+          <input type="text" placeholder="Search bills, companies, chalan..." value={search} onChange={e => setSearch(e.target.value)}
+            className="form-input" style={{ paddingLeft: 44, height: 48, borderRadius: 16, border: '1px solid #F3F4F6' }} />
+        </div>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+          {FILTERS.map(f => (
+            <button key={f.val} onClick={() => setFilter(f.val)}
+              style={{
+                padding: '8px 16px', borderRadius: 12, border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                background: filter === f.val ? '#0F0D2E' : '#F3F4F6',
+                color: filter === f.val ? 'white' : '#6B7280',
+                fontWeight: 700, fontSize: '0.8rem', transition: '0.2s'
+              }}
+            >{f.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* List */}
+      {!loaded ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {[1,2,3,4].map(i => <div key={i} className="skeleton" style={{ height: 90, borderRadius: 20 }} />)}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', background: 'white', borderRadius: 28 }}>
+          <FileText size={48} color="#E5E7EB" style={{ marginBottom: 16 }} />
+          <h3 style={{ margin: 0, color: '#111827' }}>No bills found</h3>
+          <p style={{ color: '#6B7280', fontSize: '0.875rem' }}>{search ? 'Try a different search term' : 'Start by creating a new invoice'}</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {filtered.map(bill => (
+            <BillCard key={bill.id} bill={bill} onClick={b => navigate(`/bills/${b.id}`)} onDelete={deleteBill} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

@@ -1,0 +1,204 @@
+const User = require("../models/User");
+const otpService = require("../services/otp.service");
+const tokenService = require("../services/token.service");
+
+const ADMIN_OTP_PHONE = "7610416911";
+
+function sanitizePhone(v) {
+  return String(v || "").replace(/\D/g, "");
+}
+
+function sanitizeOtp(v) {
+  return String(v || "").replace(/\D/g, "");
+}
+
+function userDto(user) {
+  return {
+    id: String(user._id),
+    phone: user.phone,
+    name: user.name || null,
+    role: user.role || null,
+    businessName: user.businessName || null,
+  };
+}
+
+async function sendOtp(req, res, next) {
+  try {
+    const phone = sanitizePhone(req.body?.phone);
+    if (phone.length !== 10) {
+      return res.status(400).json({ success: false, message: "Invalid phone" });
+    }
+
+    const { ttlSeconds } = otpService.issue(phone);
+    // TODO: integrate SMS provider (do not return OTP)
+    return res.json({ success: true, message: "OTP sent", ttlSeconds });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+async function verifyOtp(req, res, next) {
+  try {
+    const phone = sanitizePhone(req.body?.phone);
+    const otp = sanitizeOtp(req.body?.otp);
+    if (phone.length !== 10) {
+      return res.status(400).json({ success: false, message: "Invalid phone" });
+    }
+    if (otp.length !== 6) {
+      return res.status(400).json({ success: false, message: "Invalid OTP" });
+    }
+
+    const ok = otpService.verify(phone, otp);
+    if (!ok) {
+      return res.status(401).json({ success: false, message: "Invalid OTP" });
+    }
+
+    const isAdminOtpLogin = phone === ADMIN_OTP_PHONE;
+
+    const user = await User.findOneAndUpdate(
+      { phone },
+      {
+        $setOnInsert: { phone },
+        ...(isAdminOtpLogin ? { $set: { role: "admin" } } : {}),
+      },
+      { new: true, upsert: true }
+    );
+
+    const isNewUser = !user.role;
+    const accessToken = tokenService.signAccessToken(user);
+
+    const { token: refreshToken } = await tokenService.issueRefreshToken({
+      userId: user._id,
+      ip: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+
+    res.cookie("refresh_token", refreshToken, tokenService.refreshCookieOptions());
+
+    return res.json({
+      success: true,
+      isNewUser,
+      accessToken,
+      user: userDto(user),
+    });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+async function refresh(req, res, next) {
+  try {
+    const token = req.cookies?.refresh_token;
+    if (!token) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const rotated = await tokenService.rotateRefreshToken(token, {
+      ip: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+
+    const user = await User.findById(rotated.userId);
+    if (!user) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const accessToken = tokenService.signAccessToken(user);
+
+    res.cookie("refresh_token", rotated.refreshToken, tokenService.refreshCookieOptions());
+
+    return res.json({ success: true, accessToken, user: userDto(user) });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+async function logout(req, res, next) {
+  try {
+    const token = req.cookies?.refresh_token;
+    if (token) {
+      await tokenService.revokeRefreshToken(token);
+    }
+    res.clearCookie("refresh_token", tokenService.refreshCookieOptions());
+    return res.json({ success: true });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+async function me(req, res, next) {
+  try {
+    const user = await User.findById(req.user?.id);
+    if (!user) return res.status(401).json({ success: false, message: "Unauthorized" });
+    return res.json({ success: true, user: userDto(user) });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+async function setRole(req, res, next) {
+  try {
+    const role = String(req.body?.role || "").toLowerCase();
+    if (!["admin", "transport", "garage"].includes(role)) {
+      return res.status(400).json({ success: false, message: "Invalid role" });
+    }
+
+    const user = await User.findOneAndUpdate(
+      { phone: req.user.phone },
+      { $set: { role } },
+      { new: true, upsert: false }
+    );
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    return res.json({ success: true, user: userDto(user) });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+async function updateProfile(req, res, next) {
+  try {
+    const allowed = [
+      "name",
+      "businessName",
+      "setupComplete",
+      "email",
+      "address",
+      "city",
+      "pincode",
+      "panNo",
+      "gstin",
+      "aadharNo",
+      "bankDetails",
+      "signatureUrl",
+      "logoUrl",
+      "documents",
+    ];
+    const updates = {};
+    for (const k of allowed) {
+      if (req.body?.[k] !== undefined) updates[k] = req.body[k];
+    }
+
+    const user = await User.findOneAndUpdate(
+      { phone: req.user.phone },
+      { $set: updates },
+      { new: true, upsert: false }
+    );
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+    return res.json({ success: true, user: userDto(user) });
+  } catch (e) {
+    return next(e);
+  }
+}
+
+module.exports = {
+  sendOtp,
+  verifyOtp,
+  refresh,
+  logout,
+  me,
+  setRole,
+  updateProfile,
+};
+

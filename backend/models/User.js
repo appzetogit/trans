@@ -1,0 +1,40 @@
+const mongoose = require("mongoose");
+
+const UserSchema = new mongoose.Schema(
+  {
+    phone: { type: String, required: true, unique: true, index: true },
+    role: { type: String, enum: ["admin", "transport", "garage"], default: null },
+    name: { type: String, default: null },
+    businessName: { type: String, default: null },
+    setupComplete: { type: Boolean, default: false },
+    email: { type: String, default: null },
+    address: { type: String, default: null },
+    city: { type: String, default: null },
+    pincode: { type: String, default: null },
+    panNo: { type: String, default: null },
+    gstin: { type: String, default: null },
+    aadharNo: { type: String, default: null },
+    bankDetails: {
+      accountName: { type: String, default: null },
+      accountNumber: { type: String, default: null },
+      ifsc: { type: String, default: null },
+      bankName: { type: String, default: null },
+      upiId: { type: String, default: null },
+    },
+    signatureUrl: { type: String, default: null },
+    logoUrl: { type: String, default: null },
+    documents: {
+      aadharUrl: { type: String, default: null },
+      panUrl: { type: String, default: null },
+      photoUrl: { type: String, default: null },
+      rcUrl: { type: String, default: null },
+      insuranceUrl: { type: String, default: null },
+      addressProofUrl: { type: String, default: null },
+      gstCertificateUrl: { type: String, default: null },
+    },
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model("User", UserSchema);
+
