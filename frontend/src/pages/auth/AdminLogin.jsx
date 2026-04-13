@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { adminLogin } from '../../api/authApi'
 import logo from '../../assets/trans-logo.png'
 
-const ADMIN_OTP_PHONE = '7610416911'
+const ADMIN_OTP_PHONE = '9999999999'
 
 export default function AdminLogin() {
   const [email, setEmail]       = useState('')

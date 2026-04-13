@@ -6,7 +6,7 @@ const store = new Map(); // phone -> { otp, expiresAtMs }
 
 function generateOtp() {
   // Dev default OTP (any number).
-  return "110211";
+  return "123456";
 }
 
 function issueOtp(phone) {

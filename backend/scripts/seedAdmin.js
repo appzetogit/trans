@@ -9,7 +9,7 @@ const { hashPassword } = require("../src/utils/password");
 async function main() {
   const email = "panchalajay717@gmail.com".trim().toLowerCase();
   const password = "789456";
-  const defaultOtp = "110211";
+  const defaultOtp = "123456";
 
   if (!process.env.MONGO_URI) {
     throw new Error("Missing env: MONGO_URI");

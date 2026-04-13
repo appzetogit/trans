@@ -93,7 +93,7 @@ export default function Login() {
               id="phone-input"
               type="tel"
               inputMode="numeric"
-              placeholder="98765 43210"
+              placeholder="99999 99999"
               value={formatPhone(phone)}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}

@@ -2,7 +2,7 @@ const User = require("../models/User");
 const otpService = require("../services/otp.service");
 const tokenService = require("../services/token.service");
 
-const ADMIN_OTP_PHONE = "7610416911";
+const ADMIN_OTP_PHONE = "9999999999";
 
 function sanitizePhone(v) {
   return String(v || "").replace(/\D/g, "");
