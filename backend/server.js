@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const dotenv = require("dotenv");
 const cookieParser = require("cookie-parser");
+const morgan = require("morgan");
 
 dotenv.config();
 
@@ -11,12 +12,22 @@ const app = express();
 // middleware
 app.use(
   cors({
-    origin: true,
+    origin: process.env.FRONTEND_URL || true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
     credentials: true,
   })
 );
 app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
+
+// Request logging (Morgan - very fast)
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+} else {
+  // Concise logs in production to keep it fast
+  app.use(morgan(':method :url :status :response-time ms - :res[content-length]'));
+}
 
 // test route
 app.get("/", (req, res) => {
